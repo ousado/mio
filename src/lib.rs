@@ -109,10 +109,10 @@ mod net;
 mod notify;
 mod poll;
 mod sys;
-mod timer;
 mod token;
 
 pub mod channel;
+pub mod timer;
 
 pub use event::{
     PollOpt,
