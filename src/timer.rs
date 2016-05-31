@@ -16,7 +16,7 @@ const NS_PER_MS: u64 = 1_000_000;
 //   is no point to loop multiple times around the wheel in one go.
 // * New type for tick, now() -> Tick
 #[derive(Debug)]
-pub struct Timer<T> {
+pub struct OldTimer<T> {
     // Size of each tick in milliseconds
     tick_ms: u64,
     // Slab of timeout entries
@@ -35,7 +35,7 @@ pub struct Timer<T> {
 }
 
 #[derive(Clone)]
-pub struct Timeout {
+pub struct OldTimeout {
     // Reference into the timer entry slab
     token: Token,
     // Tick that it should matchup with
@@ -44,12 +44,12 @@ pub struct Timeout {
 
 type Slab<T> = ::slab::Slab<T, ::Token>;
 
-impl<T> Timer<T> {
-    pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> Timer<T> {
+impl<T> OldTimer<T> {
+    pub fn new(tick_ms: u64, mut slots: usize, mut capacity: usize) -> OldTimer<T> {
         slots = slots.next_power_of_two();
         capacity = capacity.next_power_of_two();
 
-        Timer {
+        OldTimer {
             tick_ms: tick_ms,
             entries: Slab::new(capacity),
             wheel: iter::repeat(EMPTY).take(slots).collect(),
@@ -104,12 +104,12 @@ impl<T> Timer<T> {
      *
      */
 
-    pub fn timeout_ms(&mut self, token: T, delay: u64) -> TimerResult<Timeout> {
+    pub fn timeout_ms(&mut self, token: T, delay: u64) -> OldTimerResult<OldTimeout> {
         let at = self.now_ms() + max(0, delay);
         self.timeout_at_ms(token, at)
     }
 
-    pub fn timeout_at_ms(&mut self, token: T, mut at: u64) -> TimerResult<Timeout> {
+    pub fn timeout_at_ms(&mut self, token: T, mut at: u64) -> OldTimerResult<OldTimeout> {
         // Make relative to start
         at -= self.start;
         // Calculate tick
@@ -123,7 +123,7 @@ impl<T> Timer<T> {
         self.insert(token, tick)
     }
 
-    pub fn clear(&mut self, timeout: &Timeout) -> bool {
+    pub fn clear(&mut self, timeout: &OldTimeout) -> bool {
         let links = match self.entries.get(timeout.token) {
             Some(e) => e.links,
             None => return false
@@ -139,7 +139,7 @@ impl<T> Timer<T> {
         true
     }
 
-    fn insert(&mut self, token: T, tick: u64) -> TimerResult<Timeout> {
+    fn insert(&mut self, token: T, tick: u64) -> OldTimerResult<OldTimeout> {
         // Get the slot for the requested tick
         let slot = (tick & self.mask) as usize;
         let curr = self.wheel[slot];
@@ -147,7 +147,7 @@ impl<T> Timer<T> {
         // Insert the new entry
         let token = try!(
             self.entries.insert(Entry::new(token, tick, curr))
-            .map_err(|_| TimerError::overflow()));
+            .map_err(|_| OldTimerError::overflow()));
 
         if curr != EMPTY {
             // If there was a previous entry, set its prev pointer to the new
@@ -161,7 +161,7 @@ impl<T> Timer<T> {
         trace!("inserted timout; slot={}; token={:?}", slot, token);
 
         // Return the new timeout
-        Ok(Timeout {
+        Ok(OldTimeout {
             token: token,
             tick: tick
         })
@@ -287,30 +287,30 @@ struct EntryLinks {
     next: Token
 }
 
-pub type TimerResult<T> = Result<T, TimerError>;
+pub type OldTimerResult<T> = Result<T, OldTimerError>;
 
 #[derive(Debug)]
-pub struct TimerError {
+pub struct OldTimerError {
     kind: TimerErrorKind,
     desc: &'static str,
 }
 
-impl fmt::Display for TimerError {
+impl fmt::Display for OldTimerError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}: {}", self.kind, self.desc)
     }
 }
 
-impl TimerError {
-    fn overflow() -> TimerError {
-        TimerError {
+impl OldTimerError {
+    fn overflow() -> OldTimerError {
+        OldTimerError {
             kind: TimerOverflow,
             desc: "too many timer entries"
         }
     }
 }
 
-impl error::Error for TimerError {
+impl error::Error for OldTimerError {
     fn description(&self) -> &str {
         self.desc
     }
@@ -331,7 +331,7 @@ impl fmt::Display for TimerErrorKind {
 
 #[cfg(test)]
 mod test {
-    use super::Timer;
+    use super::OldTimer;
 
     #[test]
     pub fn test_timeout_next_tick() {
@@ -495,7 +495,7 @@ mod test {
     const TICK: u64 = 100;
     const SLOTS: usize = 16;
 
-    fn timer() -> Timer<&'static str> {
-        Timer::new(TICK, SLOTS, 32)
+    fn timer() -> OldTimer<&'static str> {
+        OldTimer::new(TICK, SLOTS, 32)
     }
 }

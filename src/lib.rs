@@ -166,9 +166,9 @@ pub use poll::{
     SetReadiness,
 };
 pub use timer::{
-    Timeout,
-    TimerError,
-    TimerResult
+    OldTimeout as Timeout,
+    OldTimerError as TimeoutError,
+    OldTimerResult as TimeoutResult,
 };
 pub use token::{
     Token,
